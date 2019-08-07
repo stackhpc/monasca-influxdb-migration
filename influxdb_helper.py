@@ -32,17 +32,18 @@ class MigrationHelper(object):
                                                             offset=written)
                 try:
                     time_offset = next(self.client.query(select_query, epoch='ns').get_points(measurement)).get('time')
-                    print("{}: migrated {} until {}ns into {}".format(measurement,
-                                                                      total_written,
-                                                                      time_offset,
-                                                                      target_db))
+                    print("{}: migrated {} entries until {}ns into {}".format(measurement,
+                                                                              total_written,
+                                                                              time_offset,
+                                                                              target_db))
                 except StopIteration:
-                    print("{}: migrated {} into {}".format(measurement,
-                                                                      total_written,
-                                                                      target_db))
                     break
             else:
                 break
+
+        print("{}: migrated {} entries into {}".format(measurement,
+                                                       total_written,
+                                                       target_db))
 
     def get_measurements(self, fname):
         if fname:
