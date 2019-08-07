@@ -24,19 +24,25 @@ class MigrationHelper(object):
 
             written = next(self.client.query(migrate_query).get_points('result')).get('written')
             total_written += written
-            print("{}: migrated {} since {}ns into {}".format(measurement,
-                                                              total_written,
-                                                              time_offset,
-                                                              target_db))
             if written > 0:
                 select_query = select_query_template.format(measurement=measurement,
                                                             tenant_id=tenant_id,
                                                             time_offset=time_offset,
                                                             limit=1,
                                                             offset=written)
-                time_offset = next(self.client.query(select_query, epoch='ns').get_points(measurement)).get('time')
+                try:
+                    time_offset = next(self.client.query(select_query, epoch='ns').get_points(measurement)).get('time')
+                    print("{}: migrated {} until {}ns into {}".format(measurement,
+                                                                      total_written,
+                                                                      time_offset,
+                                                                      target_db))
+                except StopIteration:
+                    print("{}: migrated {} into {}".format(measurement,
+                                                                      total_written,
+                                                                      target_db))
+                    break
             else:
-                return
+                break
 
     def get_measurements(self, fname):
         if fname:
