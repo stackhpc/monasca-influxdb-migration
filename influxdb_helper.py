@@ -65,7 +65,7 @@ class MigrationHelper(object):
 
     def migrate(self,
                 start_time_offset=0,
-                limit=100000,
+                limit=50000,
                 target_db='monasca',
                 db_per_tenant=True,
                 measurements_file=None,
