@@ -22,7 +22,7 @@ class MigrationHelper(object):
                                                           tenant_id=tenant_id,
                                                           time_offset=time_offset,
                                                           limit=limit)
-            if total_written == 0 and self.verbosity > 0:
+            if total_written == 0 and self.verbosity > 1:
                 print(migrate_query)
 
             written = next(self.client.query(migrate_query).get_points('result')).get('written')
@@ -38,7 +38,7 @@ class MigrationHelper(object):
                     time_offset = '{}{}'.format(raw_time_offset.get('time'), epoch)
                     if (self.verbosity > 1 or
                         (self.verbosity > 0 and
-                         (total_written - written) % (limit * 10))):
+                         (total_written - written) % (limit * 10) == 0)):
                         print("{}: migrated {} entries until {} into {}".format(measurement,
                                                                                 total_written,
                                                                                 time_offset,
@@ -74,6 +74,7 @@ class MigrationHelper(object):
 
     def migrate(self,
                 start_time_offset={},
+                default_time_offset="0ns",
                 limit=50000,
                 target_db='monasca',
                 db_per_tenant=True,
@@ -83,13 +84,15 @@ class MigrationHelper(object):
         measurements = self.get_measurements(measurements_file)
         tenancy = self.get_tenancy(measurements)
         done = self.get_complete(success_file)
+
         for measurement in measurements:
             if measurement in done or measurement.startswith('log.'):
                 print('Skipping {}'.format(measurement))
             else:
                 try:
                     for tenant_id in tenancy.get(measurement):
-                        time_offset = start_time_offset.get(tenant_id, '0')
+                        time_offset = start_time_offset.get(tenant_id,
+                                                            default_time_offset)
                         self._migrate(measurement, tenant_id,
                                      time_offset=time_offset,
                                      limit=limit,
@@ -103,3 +106,4 @@ class MigrationHelper(object):
                     if failure_file:
                         with open(failure_file, 'a+') as fe:
                             fe.write('{}\n'.format(measurement))
+
