@@ -75,6 +75,7 @@ class MigrationHelper(object):
     def migrate(self,
                 start_time_offset={},
                 default_time_offset="0ns",
+                skip_functions=[lambda x: x.startswith('log.')]
                 limit=50000,
                 target_db='monasca',
                 db_per_tenant=True,
@@ -86,7 +87,8 @@ class MigrationHelper(object):
         done = self.get_complete(success_file)
 
         for measurement in measurements:
-            if measurement in done or measurement.startswith('log.'):
+            skip = any([f(measurement) for f in skif_functions])
+            if measurement in done or skip:
                 print('Skipping {}'.format(measurement))
             else:
                 try:
