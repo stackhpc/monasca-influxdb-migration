@@ -72,7 +72,7 @@ class MigrationHelper(object):
             measurements = [m.get('name') for m in self.client.query('SHOW MEASUREMENTS').get_points('measurements')]
             if fname:
                 with open(fname, 'w') as f:
-                    for r in result:
+                    for r in measurements:
                         f.write(r + '\n')
         return measurements
 
