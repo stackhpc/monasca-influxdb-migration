@@ -23,6 +23,9 @@ class MigrationHelper(object):
                  time_offset_template='now()-{}w',
                  db_per_tenant=True, **kwargs):
         total_written = 0
+        first_upper_time_offset = None
+        upper_time_offset = None
+        lower_time_offset = None
         if db_per_tenant:
             target_db = "{}_{}".format(target_db, tenant_id)
         self.client.create_database(target_db)
@@ -30,9 +33,12 @@ class MigrationHelper(object):
             self.client.create_retention_policy(database=target_db, **retention_policy)
         time_offset = start_time_offset
 
+        print('Migrating {} into {}:'.format(measurement, target_db))
         while end_time_offset > 0 and time_offset <= end_time_offset:
-            lower_time_offset=time_offset_template.format(time_offset + 1)
-            upper_time_offset=time_offset_template.format(time_offset)
+            lower_time_offset = time_offset_template.format(time_offset + 1)
+            upper_time_offset = time_offset_template.format(time_offset)
+            if not first_upper_time_offset:
+                first_upper_time_offset = upper_time_offset
             migrate_query = migrate_query_template.format(
                 target_db=target_db,
                 measurement=measurement,
@@ -48,20 +54,21 @@ class MigrationHelper(object):
             time_offset += 1
             if written > 0:
                 if (self.verbosity > 1 or (self.verbosity > 0 and time_offset % 10 == 0)):
-                    print("{}: migrated {} entries from {} until {} into {}".format(
-                        measurement,
-                        total_written,
-                        upper_time_offset,
+                    print("migrated {} entries from {} -> {} (cumulative {})".format(
+                        written,
                         lower_time_offset,
-                        target_db
+                        upper_time_offset,
+                        total_written,
                     ))
                 else:
                     print(".", end="")
                     sys.stdout.flush()
 
-        print("{}: migrated {} entries into {}".format(measurement,
-                                                       total_written,
-                                                       target_db))
+        print("**********migrated cumulative {} entries from {} -> {}.".format(
+            total_written,
+            lower_time_offset,
+            first_upper_time_offset,
+        ))
 
     def get_measurements(self, fname):
         measurements = []
