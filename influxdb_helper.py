@@ -1,8 +1,13 @@
 from __future__ import print_function
 import influxdb
+import sys
 
-migrate_query_template = 'SELECT * INTO "{target_db}"..:MEASUREMENT FROM "{measurement}" WHERE _tenant_id=\'{tenant_id}\' AND time >= {time_offset} LIMIT {limit}'
-select_query_template = 'SELECT * FROM "{measurement}" WHERE _tenant_id=\'{tenant_id}\' AND time >= {time_offset} LIMIT {limit} OFFSET {offset}'
+migrate_query_template = ('SELECT * INTO "{target_db}"..:MEASUREMENT'
+                          ' FROM "{measurement}"'
+                          ' WHERE _tenant_id=\'{tenant_id}\''
+                          ' AND time > {lower_time_offset}'
+                          ' AND time <= {upper_time_offset}'
+                          ' GROUP BY *')
 
 class MigrationHelper(object):
 
@@ -10,56 +15,64 @@ class MigrationHelper(object):
         self.client = influxdb.InfluxDBClient(host=host, database=source_db)
         self.verbosity = verbosity
 
-
-    def _migrate(self, measurement, tenant_id, limit, time_offset, target_db, db_per_tenant, epoch='ns'):
+    def _migrate(self, measurement, tenant_id,
+                 start_time_offset, end_time_offset,
+                 target_db='target', retention_policy={},
+                 time_offset_template='now()-{}w',
+                 db_per_tenant=True, **kwargs):
         total_written = 0
         if db_per_tenant:
             target_db = "{}_{}".format(target_db, tenant_id)
         self.client.create_database(target_db)
-        while True:
-            migrate_query = migrate_query_template.format(target_db=target_db,
-                                                          measurement=measurement,
-                                                          tenant_id=tenant_id,
-                                                          time_offset=time_offset,
-                                                          limit=limit)
+        if retention_policy:
+            self.client.create_retention_policy(database=target_db, **retention_policy)
+        time_offset = start_time_offset
+
+        while end_time_offset > 0 and time_offset <= end_time_offset:
+            lower_time_offset=time_offset_template.format(time_offset + 1)
+            upper_time_offset=time_offset_template.format(time_offset)
+            migrate_query = migrate_query_template.format(
+                target_db=target_db,
+                measurement=measurement,
+                tenant_id=tenant_id,
+                lower_time_offset=lower_time_offset,
+                upper_time_offset=upper_time_offset,
+            )
             if total_written == 0 and self.verbosity > 1:
                 print(migrate_query)
 
             written = next(self.client.query(migrate_query).get_points('result')).get('written')
             total_written += written
+            time_offset += 1
             if written > 0:
-                select_query = select_query_template.format(measurement=measurement,
-                                                            tenant_id=tenant_id,
-                                                            time_offset=time_offset,
-                                                            limit=1,
-                                                            offset=written)
-                try:
-                    raw_time_offset = next(self.client.query(select_query, epoch=epoch).get_points(measurement))
-                    time_offset = '{}{}'.format(raw_time_offset.get('time'), epoch)
-                    if (self.verbosity > 1 or
-                        (self.verbosity > 0 and
-                         (total_written - written) % (limit * 10) == 0)):
-                        print("{}: migrated {} entries until {} into {}".format(measurement,
-                                                                                total_written,
-                                                                                time_offset,
-                                                                                target_db))
-                    else:
-                        print(".", end="")
-                except StopIteration:
-                    break
-            else:
-                break
+                if (self.verbosity > 1 or (self.verbosity > 0 and time_offset % 10 == 0)):
+                    print("{}: migrated {} entries from {} until {} into {}".format(
+                        measurement,
+                        total_written,
+                        upper_time_offset,
+                        lower_time_offset,
+                        target_db
+                    ))
+                else:
+                    print(".", end="")
+                    sys.stdout.flush()
 
         print("{}: migrated {} entries into {}".format(measurement,
                                                        total_written,
                                                        target_db))
 
     def get_measurements(self, fname):
+        measurements = []
         if fname:
-            with open(fname) as fm:
-                return [l.strip() for l in fm.readlines()]
-        else:
-            return [m.get('name') for m in self.client.query('SHOW MEASUREMENTS').get_points('measurements')]
+            with open(fname, 'a+') as f:
+                measurements = [l.strip() for l in f.readlines()]
+        if not measurements:
+            measurements = [m.get('name') for m in self.client.query('SHOW MEASUREMENTS').get_points('measurements')]
+            if fname:
+                with open(fname, 'w') as f:
+                    for r in result:
+                        f.write(r + '\n')
+        return measurements
 
     def get_tenancy(self, measurements):
         result = self.client.query("SHOW TAG VALUES WITH KEY = _tenant_id")
@@ -73,33 +86,29 @@ class MigrationHelper(object):
             return {}
 
     def migrate(self,
-                start_time_offset={},
-                default_time_offset="0ns",
-                skip_functions=[lambda x: x.startswith('log.')]
-                limit=50000,
-                target_db='monasca',
-                db_per_tenant=True,
-                measurements_file=None,
-                success_file=None,
-                failure_file=None):
+                project_defaults={},
+                default_end_time_offset=52*5,
+                default_start_time_offset=0,
+                skip_functions=[lambda x: x.startswith('log.')],
+                measurements_file=None, success_file=None, failure_file=None, **kwargs):
         measurements = self.get_measurements(measurements_file)
         tenancy = self.get_tenancy(measurements)
         done = self.get_complete(success_file)
 
         for measurement in measurements:
-            skip = any([f(measurement) for f in skif_functions])
+            skip = any([f(measurement) for f in skip_functions])
             if measurement in done or skip:
                 print('Skipping {}'.format(measurement))
             else:
                 try:
                     for tenant_id in tenancy.get(measurement):
-                        time_offset = start_time_offset.get(tenant_id,
-                                                            default_time_offset)
+                        start_time_offset = project_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
+                        end_time_offset = project_defaults.get(tenant_id, {}) .get('end', default_end_time_offset)
+                        retention_policy = project_defaults.get(tenant_id, {}) .get('rp', {})
                         self._migrate(measurement, tenant_id,
-                                     time_offset=time_offset,
-                                     limit=limit,
-                                     target_db=target_db,
-                                     db_per_tenant=db_per_tenant)
+                                     start_time_offset=start_time_offset,
+                                     end_time_offset=end_time_offset,
+                                     retention_policy=retention_policy, **kwargs)
                     if success_file:
                         with open(success_file, 'a+') as fd:
                             fd.write('{}\n'.format(measurement))
