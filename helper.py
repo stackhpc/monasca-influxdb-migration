@@ -9,6 +9,8 @@ migrate_query_template = ('SELECT * INTO "{target_db}"..:MEASUREMENT'
                           ' AND time <= {upper_time_offset}'
                           ' GROUP BY *')
 
+two_weeks = dict(name='2w', duration='2w', replication='1', default=True)
+
 class MigrationHelper(object):
 
     def __init__(self, source_db, host, verbosity=1):
