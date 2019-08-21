@@ -22,19 +22,21 @@ class MigrationHelper(object):
                  target_db='target', retention_policy={},
                  time_offset_template='now()-{}w',
                  db_per_tenant=True, **kwargs):
+
         total_written = 0
         first_upper_time_offset = None
         upper_time_offset = None
         lower_time_offset = None
+        time_offset = start_time_offset
+
         if db_per_tenant:
             target_db = "{}_{}".format(target_db, tenant_id)
         self.client.create_database(target_db)
         if retention_policy:
             self.client.create_retention_policy(database=target_db, **retention_policy)
-        time_offset = start_time_offset
+        print('         into {}:'.format(target_db))
 
-        print('Migrating {} into {}:'.format(measurement, target_db))
-        while end_time_offset > 0 and time_offset <= end_time_offset:
+        while end_time_offset > 0 and time_offset < end_time_offset:
             lower_time_offset = time_offset_template.format(time_offset + 1)
             upper_time_offset = time_offset_template.format(time_offset)
             if not first_upper_time_offset:
@@ -46,7 +48,7 @@ class MigrationHelper(object):
                 lower_time_offset=lower_time_offset,
                 upper_time_offset=upper_time_offset,
             )
-            if total_written == 0 and self.verbosity > 1:
+            if (total_written == 0 and self.verbosity > 0) or self.verbosity > 1:
                 print(migrate_query)
 
             written = next(self.client.query(migrate_query).get_points('result')).get('written')
@@ -54,7 +56,7 @@ class MigrationHelper(object):
             time_offset += 1
             if written > 0:
                 if (self.verbosity > 1 or (self.verbosity > 0 and time_offset % 10 == 0)):
-                    print("migrated {} entries from {} -> {} (cumulative {})".format(
+                    print("         migrated {} entries from {} -> {} (cumulative {})".format(
                         written,
                         lower_time_offset,
                         upper_time_offset,
@@ -64,7 +66,7 @@ class MigrationHelper(object):
                     print(".", end="")
                     sys.stdout.flush()
 
-        print("**********migrated cumulative {} entries from {} -> {}.".format(
+        print("         finished migrating a total of {} entries from {} -> {}.".format(
             total_written,
             lower_time_offset,
             first_upper_time_offset,
@@ -104,11 +106,12 @@ class MigrationHelper(object):
         tenancy = self.get_tenancy(measurements)
         done = self.get_complete(success_file)
 
-        for measurement in measurements:
+        for i, measurement in enumerate(measurements):
             skip = any([f(measurement) for f in skip_functions])
             if measurement in done or skip:
-                print('Skipping {}'.format(measurement))
+                print('Skipping {} ({}/{})'.format(measurement, i+1, len(measurements)))
             else:
+                print('Migrating {} ({}/{})'.format(measurement, i+1, len(measurements)))
                 try:
                     for tenant_id in tenancy.get(measurement):
                         start_time_offset = project_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
