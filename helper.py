@@ -149,10 +149,10 @@ class MigrationHelper(object):
                         fd.write('{}\n'.format(measurement))
                 done.add(measurement)
             except Exception as e:
-                print(e, measurement)
+                print(e)
                 if failure_file:
                     with open(failure_file, 'a+') as fe:
-                        fe.write('{}\n'.format(measurement))
+                        fe.write('{}\t{}\n'.format(measurement, e))
                 fail.add(measurement)
             print("{}/{} (done {} + skip {} + fail {})/{}".format(i+1,
-                len(todo), len(done), len(skip), len(fail)), len(measurements))
+                len(todo), len(done), len(skip), len(fail), len(measurements)))
