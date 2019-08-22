@@ -1,6 +1,7 @@
 from __future__ import print_function
 import influxdb
 import sys
+import os
 
 migrate_query_template = ('SELECT * INTO "{target_db}"..:MEASUREMENT'
                           ' FROM "{measurement}"'
@@ -105,13 +106,20 @@ class MigrationHelper(object):
         measurements = self.get_measurements(measurements_file)
         tenancy = self.get_tenancy(measurements)
         done = self.get_complete(success_file)
+        skip = set()
+        fail = set()
+        if failure_file:
+            if os.path.exists(failure_file):
+                os.remove(failure_file)
 
         for i, measurement in enumerate(measurements):
-            skip = any([f(measurement) for f in skip_functions])
-            if measurement in done or skip:
-                print('Skipping {} ({}/{})'.format(measurement, i+1, len(measurements)))
+            if measurement in done:
+                print('Already done {}'.format(measurement, i+1, len(measurements)))
+            elif any([f(measurement) for f in skip_functions]):
+                print('Skipping {}'.format(measurement, i+1, len(measurements)))
+                skip.add(measurement)
             else:
-                print('Migrating {} ({}/{})'.format(measurement, i+1, len(measurements)))
+                print('Migrating {}'.format(measurement))
                 try:
                     for tenant_id in tenancy.get(measurement):
                         start_time_offset = project_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
@@ -124,9 +132,12 @@ class MigrationHelper(object):
                     if success_file:
                         with open(success_file, 'a+') as fd:
                             fd.write('{}\n'.format(measurement))
+                    done.add(measurement)
                 except Exception as e:
                     print(e, measurement)
                     if failure_file:
                         with open(failure_file, 'a+') as fe:
                             fe.write('{}\n'.format(measurement))
-
+                    fail.add(measurement)
+            print("Progress {}/{}, done {}, skip {}, fail {}".format(i+1,
+                len(measurements), len(done), len(skip), len(fail)))
