@@ -113,7 +113,7 @@ class MigrationHelper(object):
                 os.remove(failure_file)
 
         todo = []
-        for measurement in enumerate(measurements):
+        for measurement in measurements:
             if any([f(measurement) for f in skip_functions]):
                 skip.add(measurement)
                 continue
