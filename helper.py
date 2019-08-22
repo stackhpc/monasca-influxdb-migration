@@ -13,7 +13,7 @@ two_weeks = dict(name='2w', duration='2w', replication='1', default=True)
 
 class MigrationHelper(object):
 
-    def __init__(self, source_db, host, verbosity=1):
+    def __init__(self, source_db, host, verbosity=0):
         self.client = influxdb.InfluxDBClient(host=host, database=source_db)
         self.verbosity = verbosity
 
@@ -48,7 +48,7 @@ class MigrationHelper(object):
                 lower_time_offset=lower_time_offset,
                 upper_time_offset=upper_time_offset,
             )
-            if (total_written == 0 and self.verbosity > 0) or self.verbosity > 1:
+            if self.verbosity > 1:
                 print(migrate_query)
 
             written = next(self.client.query(migrate_query).get_points('result')).get('written')
