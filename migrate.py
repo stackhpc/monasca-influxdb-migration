@@ -8,6 +8,7 @@ if __name__ == "__main__":
                     "03cc1b94463c44e791222cb82008b8b1": dict(end=2, rp=two_weeks), # alaska-prod
                     "703c23c3219748d484f5d863e7896317": dict(end=2, rp=two_weeks), # alaska-alt-1
                    },
+                   time_unit='w',
                    measurements_file='migrate-measurements.log',
                    success_file='migrate-success.log',
                    failure_file='migrate-failure.log')

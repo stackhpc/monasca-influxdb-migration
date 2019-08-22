@@ -32,7 +32,7 @@ class MigrationHelper(object):
     def _migrate(self, measurement, tenant_id,
                  start_time_offset, end_time_offset,
                  target_db='target', retention_policy={},
-                 time_offset_template='now()-{}w',
+                 time_unit='w',
                  db_per_tenant=True, **kwargs):
 
         total_written = 0
@@ -48,8 +48,8 @@ class MigrationHelper(object):
         print('         into {}:'.format(target_db))
 
         while end_time_offset > 0 and time_offset < end_time_offset:
-            lower_time_offset = time_offset_template.format(time_offset + 1)
-            upper_time_offset = time_offset_template.format(time_offset)
+            lower_time_offset = 'now()-{}{}'.format(time_offset + 1, time_unit)
+            upper_time_offset = 'now()-{}{}'.format(time_offset, time_unit)
             if not first_upper_time_offset:
                 first_upper_time_offset = upper_time_offset
             migrate_query = migrate_query_template.format(
