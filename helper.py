@@ -26,8 +26,7 @@ class MigrationHelper(object):
 
         total_written = 0
         first_upper_time_offset = None
-        upper_time_offset = None
-        lower_time_offset = None
+        last_lower_time_offset = None
         time_offset = start_time_offset
 
         if db_per_tenant:
@@ -56,6 +55,7 @@ class MigrationHelper(object):
             total_written += written
             time_offset += 1
             if written > 0:
+                last_lower_time_offset = lower_time_offset
                 if (self.verbosity > 1 or (self.verbosity > 0 and time_offset % 10 == 0)):
                     print("         migrated {} entries from {} -> {} (cumulative {})".format(
                         written,
@@ -69,7 +69,7 @@ class MigrationHelper(object):
 
         print("         finished migrating a total of {} entries from {} -> {}.".format(
             total_written,
-            lower_time_offset,
+            last_lower_time_offset,
             first_upper_time_offset,
         ))
 
