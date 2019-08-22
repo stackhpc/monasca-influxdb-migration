@@ -112,32 +112,36 @@ class MigrationHelper(object):
             if os.path.exists(failure_file):
                 os.remove(failure_file)
 
-        for i, measurement in enumerate(measurements):
-            if measurement in done:
-                print('Already done {}'.format(measurement, i+1, len(measurements)))
-            elif any([f(measurement) for f in skip_functions]):
-                print('Skipping {}'.format(measurement, i+1, len(measurements)))
+        todo = []
+        for measurement in enumerate(measurements):
+            if any([f(measurement) for f in skip_functions]):
                 skip.add(measurement)
+                continue
+            elif measurement in done:
+                continue
             else:
-                print('Migrating {}'.format(measurement))
-                try:
-                    for tenant_id in tenancy.get(measurement):
-                        start_time_offset = project_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
-                        end_time_offset = project_defaults.get(tenant_id, {}) .get('end', default_end_time_offset)
-                        retention_policy = project_defaults.get(tenant_id, {}) .get('rp', {})
-                        self._migrate(measurement, tenant_id,
-                                     start_time_offset=start_time_offset,
-                                     end_time_offset=end_time_offset,
-                                     retention_policy=retention_policy, **kwargs)
-                    if success_file:
-                        with open(success_file, 'a+') as fd:
-                            fd.write('{}\n'.format(measurement))
-                    done.add(measurement)
-                except Exception as e:
-                    print(e, measurement)
-                    if failure_file:
-                        with open(failure_file, 'a+') as fe:
-                            fe.write('{}\n'.format(measurement))
-                    fail.add(measurement)
-            print("Progress {}/{}, done {}, skip {}, fail {}".format(i+1,
-                len(measurements), len(done), len(skip), len(fail)))
+                todo.append(measurement)
+
+        for i, measurement in enumerate(todo):
+            print('Migrating {}'.format(measurement))
+            try:
+                for tenant_id in tenancy.get(measurement):
+                    start_time_offset = project_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
+                    end_time_offset = project_defaults.get(tenant_id, {}) .get('end', default_end_time_offset)
+                    retention_policy = project_defaults.get(tenant_id, {}) .get('rp', {})
+                    self._migrate(measurement, tenant_id,
+                                 start_time_offset=start_time_offset,
+                                 end_time_offset=end_time_offset,
+                                 retention_policy=retention_policy, **kwargs)
+                if success_file:
+                    with open(success_file, 'a+') as fd:
+                        fd.write('{}\n'.format(measurement))
+                done.add(measurement)
+            except Exception as e:
+                print(e, measurement)
+                if failure_file:
+                    with open(failure_file, 'a+') as fe:
+                        fe.write('{}\n'.format(measurement))
+                fail.add(measurement)
+            print("{}/{} (done {} + skip {} + fail {})/{}".format(i+1,
+                len(todo), len(done), len(skip), len(fail)), len(measurements))
