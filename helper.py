@@ -1,7 +1,14 @@
 from __future__ import print_function
+from oslo_config import cfg
 import influxdb
 import sys
 import os
+
+def parse_config(config_file):
+    sections = {}
+    parser = cfg.ConfigParser(config_file, sections)
+    parser.parse()
+    return {k: v.pop() for k, v in sections.get('influxdb').iteritems()}
 
 migrate_query_template = ('SELECT * INTO "{target_db}"..:MEASUREMENT'
                           ' FROM "{measurement}"'
@@ -14,8 +21,12 @@ two_weeks = dict(name='2w', duration='2w', replication='1', default=True)
 
 class MigrationHelper(object):
 
-    def __init__(self, source_db, host, verbosity=0):
-        self.client = influxdb.InfluxDBClient(host=host, database=source_db)
+    def __init__(self, config_file=None, verbosity=0):
+        config = parse_config(config_file)
+        print(config)
+	self.client = influxdb.InfluxDBClient(host=config.get('ip_address'),
+					      database=config.get('database_name'),
+                                              port=config.get('port'))
         self.verbosity = verbosity
 
     def _migrate(self, measurement, tenant_id,
