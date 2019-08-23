@@ -17,8 +17,6 @@ migrate_query_template = ('SELECT * INTO "{target_db}"..:MEASUREMENT'
                           ' AND time <= {upper_time_offset}'
                           ' GROUP BY *')
 
-two_weeks = dict(name='2w', duration='2w', replication='1', default=True)
-
 class MigrationHelper(object):
 
     def __init__(self, config_file=None, verbosity=0):
@@ -112,7 +110,7 @@ class MigrationHelper(object):
                 project_defaults={},
                 default_end_time_offset=52*5,
                 default_start_time_offset=0,
-                skip_functions=[lambda x: x.startswith('log.')],
+                skip_functions=[],
                 measurements_file=None, success_file=None, failure_file=None, **kwargs):
         measurements = self.get_measurements(measurements_file)
         tenancy = self.get_tenancy(measurements)
