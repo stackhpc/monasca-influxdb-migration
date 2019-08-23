@@ -22,8 +22,8 @@ class MigrationHelper(object):
     def __init__(self, config_file=None, verbosity=0):
         config = parse_config(config_file)
         print(config)
-	self.client = influxdb.InfluxDBClient(host=config.get('ip_address'),
-					      database=config.get('database_name'),
+        self.client = influxdb.InfluxDBClient(host=config.get('ip_address'),
+                                              database=config.get('database_name'),
                                               port=config.get('port'))
         self.verbosity = verbosity
 
@@ -107,7 +107,7 @@ class MigrationHelper(object):
             return {}
 
     def migrate(self,
-                project_defaults={},
+                tenant_defaults={},
                 default_end_time_offset=52*5,
                 default_start_time_offset=0,
                 skip_functions=[],
@@ -135,9 +135,9 @@ class MigrationHelper(object):
             print('Migrating {}'.format(measurement))
             try:
                 for tenant_id in tenancy.get(measurement):
-                    start_time_offset = project_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
-                    end_time_offset = project_defaults.get(tenant_id, {}) .get('end', default_end_time_offset)
-                    retention_policy = project_defaults.get(tenant_id, {}) .get('rp', {})
+                    start_time_offset = tenant_defaults.get(tenant_id, {}).get('start', default_start_time_offset)
+                    end_time_offset = tenant_defaults.get(tenant_id, {}) .get('end', default_end_time_offset)
+                    retention_policy = tenant_defaults.get(tenant_id, {}) .get('rp', {})
                     self._migrate(measurement, tenant_id,
                                  start_time_offset=start_time_offset,
                                  end_time_offset=end_time_offset,

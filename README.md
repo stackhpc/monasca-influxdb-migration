@@ -4,9 +4,12 @@ Install python requirements:
 
 	pip install -r requirements.txt
 
-Next, edit `influxdb_{migrate, restore}.py` as appropriate and execute:
+Run `link-persister-conf.sh` to hard link to `persister.conf` in your
+kolla-ansible deployed control plane.
 
-- `influxdb_migrate.py` to migrate data from a monolithic database to a database
+Next, edit `{migrate, restore}.py` as appropriate and execute:
+
+- `migrate.py` to migrate data from a monolithic database to a database
   per tenancy model.
-- `influxdb_restore.py` to sideload data to a monolithic database from a backed
+- `restore.py` to sideload data to a monolithic database from a backed
   up database.
